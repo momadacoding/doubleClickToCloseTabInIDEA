@@ -59,17 +59,13 @@ class DoubleClickTabCloserInitializer : ProjectActivity {
 // TabDoubleClickListener class (from the last working version after fixing compilation errors)
 private class TabDoubleClickListener(private val project: Project) : AWTEventListener {
 
-    // Helper to convert MouseEvent ID to a readable string
+    // Helper to convert MouseEvent ID to a readable string (can be kept for debugging)
     private fun mouseEventIdToString(id: Int): String {
         return when (id) {
             MouseEvent.MOUSE_CLICKED -> "MOUSE_CLICKED"
             MouseEvent.MOUSE_PRESSED -> "MOUSE_PRESSED"
             MouseEvent.MOUSE_RELEASED -> "MOUSE_RELEASED"
-            MouseEvent.MOUSE_MOVED -> "MOUSE_MOVED"
-            MouseEvent.MOUSE_ENTERED -> "MOUSE_ENTERED"
-            MouseEvent.MOUSE_EXITED -> "MOUSE_EXITED"
-            MouseEvent.MOUSE_DRAGGED -> "MOUSE_DRAGGED"
-            MouseEvent.MOUSE_WHEEL -> "MOUSE_WHEEL"
+            // ... other cases ...
             else -> "UNKNOWN_MOUSE_EVENT_ID_$id"
         }
     }
@@ -79,31 +75,25 @@ private class TabDoubleClickListener(private val project: Project) : AWTEventLis
             return
         }
 
-        // Log ALL mouse events this listener receives, before any filtering
-        // This is crucial for debugging the clickCount issue
-        LOG.info(
-            "RAW MOUSE EVENT: ID=${mouseEventIdToString(event.id)}, " +
-            "ClickCount=${event.clickCount}, Button=${event.button}, " +
-            "Component=${event.component?.javaClass?.name}, " +
-            "isLeftButton=${SwingUtilities.isLeftMouseButton(event)}, " +
-            "isPopupTrigger=${event.isPopupTrigger}"
-        )
+        // Optional: Keep raw logging for deep debugging if issues persist
+        // LOG.info(
+        //     "RAW MOUSE EVENT: ID=${mouseEventIdToString(event.id)}, " +
+        //     "ClickCount=${event.clickCount}, Button=${event.button}, " +
+        //     "Component=${event.component?.javaClass?.name}"
+        // )
 
-        // We will now look for MOUSE_PRESSED with clickCount == 2
-        if (event.id != MouseEvent.MOUSE_PRESSED) {
-            return // Only interested in MOUSE_PRESSED for this strategy
-        }
-
-        if (!SwingUtilities.isLeftMouseButton(event) || event.clickCount != 2) {
-            // Log why we are returning if the condition isn't met
-            // LOG.info("MOUSE_PRESSED event did not meet criteria: isLeft=${SwingUtilities.isLeftMouseButton(event)}, clickCount=${event.clickCount}")
+        if (event.id != MouseEvent.MOUSE_PRESSED) { // Still targeting MOUSE_PRESSED
             return
         }
 
-        LOG.info("Candidate MOUSE_PRESSED event for double-click: Component=${event.component?.javaClass?.simpleName}")
+        if (!SwingUtilities.isLeftMouseButton(event) || event.clickCount != 2) {
+            return
+        }
+
+        // LOG.info("Candidate MOUSE_PRESSED event for double-click: Component=${event.component?.javaClass?.simpleName}") // Can be commented out for cleaner logs
 
         val component = event.component as? JComponent ?: run {
-            LOG.warn("Event component is null or not a JComponent. Ignoring.")
+            // LOG.warn("Event component is null or not a JComponent. Ignoring.") // Can be commented out
             return
         }
 
@@ -111,18 +101,18 @@ private class TabDoubleClickListener(private val project: Project) : AWTEventLis
         val virtualFileFromContext: VirtualFile? = dataContext.getData(CommonDataKeys.VIRTUAL_FILE)
         val currentProjectFromContext: Project? = dataContext.getData(CommonDataKeys.PROJECT)
 
-        LOG.info("DataContext info: Project from context='${currentProjectFromContext?.name}', Listener's project='${project.name}'")
-        LOG.info("DataContext info: VIRTUAL_FILE='${virtualFileFromContext?.name}'")
+        // LOG.info("DataContext info: Project from context='${currentProjectFromContext?.name}', Listener's project='${project.name}'") // Can be commented out
+        // LOG.info("DataContext info: VIRTUAL_FILE='${virtualFileFromContext?.name}'") // Can be commented out
 
         if (currentProjectFromContext != project) {
-            LOG.debug("Ignoring event: Project from DataContext ('${currentProjectFromContext?.name}') doesn't match listener's project ('${project.name}').")
+            // LOG.debug("Ignoring event: Project from DataContext doesn't match listener's project.") // Can be commented out
             return
         }
 
         val fileToClose: VirtualFile? = virtualFileFromContext
 
         if (fileToClose != null) {
-            LOG.info("File to potentially close from MOUSE_PRESSED: ${fileToClose.name} in project ${project.name}")
+            // LOG.info("File to potentially close from MOUSE_PRESSED: ${fileToClose.name} in project ${project.name}") // Can be commented out
 
             var currentComponent: Component? = component
             var isLikelyTabClick = false
@@ -136,16 +126,22 @@ private class TabDoubleClickListener(private val project: Project) : AWTEventLis
                     className.contains("SingleHeightTabs")
                 ) {
                     isLikelyTabClick = true
-                    LOG.info("Heuristic pass: Clicked component or ancestor '${className}' suggests a tab UI element.")
+                    // LOG.info("Heuristic pass: Clicked component or ancestor '${className}' suggests a tab UI element.") // Can be commented out
                     break
                 }
                 currentComponent = currentComponent.parent
             }
 
             if (!isLikelyTabClick) {
-                LOG.info("Heuristic fail: MOUSE_PRESSED with a file ('${fileToClose.name}') occurred on component '${component.javaClass.name}', but it or its direct ancestors don't look like a known tab UI element. Ignoring.")
+                // LOG.info("Heuristic fail: MOUSE_PRESSED with a file on a non-tab component. Ignoring.") // Can be commented out
                 return
             }
+
+            // **** THIS IS THE KEY CHANGE ****
+            // If we've determined this is a double-click on a tab we want to close,
+            // consume the event to prevent other listeners from processing it further.
+            event.consume()
+            LOG.info("Consumed MOUSE_PRESSED event for file: ${fileToClose.name} to prevent further processing.")
 
             ApplicationManager.getApplication().invokeLater {
                 if (project.isDisposed) {
@@ -156,16 +152,13 @@ private class TabDoubleClickListener(private val project: Project) : AWTEventLis
                 if (fileEditorManager.isFileOpen(fileToClose)) {
                     LOG.info("Attempting to close file: ${fileToClose.name}")
                     fileEditorManager.closeFile(fileToClose)
-                    // Consume the event *if possible and makes sense*.
-                    // For AWTEventListener, consuming the original event is tricky as it's already dispatched.
-                    // event.consume() // Might not have the desired effect here.
                     LOG.info("File close command issued for: ${fileToClose.name}")
                 } else {
-                    LOG.info("File '${fileToClose.name}' is no longer open or was not recognized by FileEditorManager.")
+                    // LOG.info("File '${fileToClose.name}' is no longer open or was not recognized by FileEditorManager.") // Can be commented out
                 }
             }
         } else {
-            LOG.info("No VirtualFile found in DataContext for the MOUSE_PRESSED event on component: ${component.javaClass.name}. Cannot determine file to close.")
+            // LOG.info("No VirtualFile found in DataContext for the MOUSE_PRESSED event. Cannot determine file to close.") // Can be commented out
         }
     }
 }
