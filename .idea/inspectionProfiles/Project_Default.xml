@@ -1,0 +1,37 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyAttributeOutsideInitInspection" enabled="true" level="INFORMATION" enabled_by_default="true" />
+    <inspection_tool class="PyPep8NamingInspection" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <option name="ignoredErrors">
+        <list>
+          <option value="N806" />
+          <option value="N803" />
+          <option value="N802" />
+          <option value="N812" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="LC" />
+          <option value="ERROR" />
+          <option value="INFO" />
+          <option value="IINFO" />
+          <option value="GET_DICT" />
+          <option value="SS" />
+          <option value="KK" />
+          <option value="GG" />
+          <option value="RELEASE_ASSERT" />
+          <option value="LC_AUTO" />
+          <option value="ZH_STR" />
+          <option value="UnregisterFunc" />
+          <option value="RegisterFunc" />
+          <option value="WARNING" />
+          <option value="RegisterOnce" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
