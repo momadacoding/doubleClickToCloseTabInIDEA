@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.liuhao"
-version = "1.0-SNAPSHOT"
+version = "1.0.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
